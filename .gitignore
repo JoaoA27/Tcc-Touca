@@ -1,0 +1,10 @@
+# Modelos YOLO
+*.pt
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Ambientes virtuais
+venv/
+.venv/
