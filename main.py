@@ -3,16 +3,11 @@ import time
 
 from camera import Camera
 from detector import PersonDetector
-from zonas import ZonaContagem
 from tracker import PersonTracker
-from contador import ContadorPessoas
-from mqtt_service import MQTTService
 
 from config import (
     WINDOW_NAME,
     SHOW_FPS,
-    CAMERA_ID,
-    MQTT_ATIVO,
 )
 
 
@@ -26,22 +21,9 @@ def main():
 
     detector = PersonDetector()
 
-    tracker = PersonTracker(detector)
-
-    zona = ZonaContagem(
-        camera_id=CAMERA_ID
+    tracker = PersonTracker(
+        detector
     )
-
-    contador = ContadorPessoas(
-        tempo_minimo_zona=zona.tempo_minimo_zona
-    )
-    mqtt_service = None
-
-    if MQTT_ATIVO:
-
-        mqtt_service = MQTTService()
-
-        mqtt_service.conectar()
 
     previous_time = time.time()
 
@@ -55,24 +37,14 @@ def main():
                 break
 
             # =========================
-            # YOLO + BOT-SORT
+            # PESSOA + BYTETRACK
             # =========================
 
-            results = tracker.track(frame)
-
-            annotated_frame = results[0].plot()
-
-            # =========================
-            # ZONA
-            # =========================
-
-            zona.desenhar(
-                annotated_frame
+            results = tracker.track(
+                frame
             )
 
-            # =========================
-            # PESSOAS
-            # =========================
+            annotated_frame = frame.copy()
 
             boxes = results[0].boxes
 
@@ -85,8 +57,13 @@ def main():
                     # =========================
 
                     if box.id is not None:
-                        track_id = int(box.id.item())
+
+                        track_id = int(
+                            box.id.item()
+                        )
+
                     else:
+
                         track_id = None
 
                     # =========================
@@ -97,138 +74,32 @@ def main():
                         box.xyxy[0].tolist()
                     )
 
-                    # =========================
-                    # PONTO DE REFERÊNCIA
-                    # =========================
-
-                    ponto_x = int(
-                        (x1 + x2) / 2
-                    )
-
-                    ponto_y = int(
-                        y1
-                        +
-                        (y2 - y1)
-                        *
-                        zona.ponto_referencia_y
-                    )
-
-                    ponto = (
-                        ponto_x,
-                        ponto_y
-                    )
+                    x1 = int(x1)
+                    y1 = int(y1)
+                    x2 = int(x2)
+                    y2 = int(y2)
 
                     # =========================
-                    # ESTÁ NA ZONA?
+                    # DESENHA PESSOA
                     # =========================
 
-                    dentro = zona.ponto_dentro(
+                    cv2.rectangle(
                         annotated_frame,
-                        ponto
-                    )
-
-                    # =========================
-                    # LADO DA LINHA
-                    # =========================
-
-                    lado = zona.lado_da_linha(
-                        annotated_frame,
-                        ponto
-                    )
-
-                    # =========================
-                    # CONTADOR
-                    # =========================
-
-                    if track_id is not None:
-
-                        evento = contador.atualizar(
-                            track_id=track_id,
-                            dentro=dentro,
-                            lado=lado
-                        )
-
-                        # Evento de entrada ou saída
-                        if evento is not None:
-
-                            print(
-                                f"{evento['tipo'].upper()} | "
-                                f"ID: {evento['track_id']} | "
-                                f"{evento['lado_origem']} -> "
-                                f"{evento['lado_destino']} | "
-                                f"Tempo zona: "
-                                f"{evento['tempo_zona']}s"
-                            )
-
-                            if (
-                                MQTT_ATIVO
-                                and mqtt_service is not None
-                            ):
-
-                                mqtt_service.publicar_evento(
-                                    evento
-                                )
-
-                    # =========================
-                    # VISUALIZAÇÃO DA PESSOA
-                    # =========================
-
-                    if dentro:
-
-                        cor = (
-                            0,
-                            255,
-                            0
-                        )
-
-                        status = (
-                            f"ID {track_id} | "
-                            f"DENTRO | "
-                            f"lado: {lado}"
-                        )
-
-                    else:
-
-                        cor = (
-                            0,
-                            0,
-                            255
-                        )
-
-                        status = (
-                            f"ID {track_id} | "
-                            f"FORA | "
-                            f"lado: {lado}"
-                        )
-
-                    # Ponto de referência
-                    cv2.circle(
-                        annotated_frame,
-                        ponto,
-                        7,
-                        cor,
-                        -1
-                    )
-
-                    # Texto da pessoa
-                    cv2.putText(
-                        annotated_frame,
-                        status,
-                        (
-                            ponto_x + 10,
-                            ponto_y
-                        ),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.55,
-                        cor,
+                        (x1, y1),
+                        (x2, y2),
+                        (0, 255, 0),
                         2
                     )
 
-            # =========================
-            # LIMPEZA DE TRACKS ANTIGOS
-            # =========================
-
-            contador.limpar_tracks_antigos()
+                    cv2.putText(
+                        annotated_frame,
+                        f"Pessoa | ID {track_id}",
+                        (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        (0, 255, 0),
+                        2
+                    )
 
             # =========================
             # FPS
@@ -243,7 +114,9 @@ def main():
                     1e-6
                 )
 
-                previous_time = current_time
+                previous_time = (
+                    current_time
+                )
 
                 cv2.putText(
                     annotated_frame,
@@ -256,48 +129,7 @@ def main():
                 )
 
             # =========================
-            # CONTADORES NA TELA
-            # =========================
-
-            cv2.putText(
-                annotated_frame,
-                f"Entradas: {contador.entradas}",
-                (20, 80),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 0),
-                2
-            )
-
-            cv2.putText(
-                annotated_frame,
-                f"Saidas: {contador.saidas}",
-                (20, 115),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 0, 255),
-                2
-            )
-
-            # Ocupação provisória
-            ocupacao = (
-                contador.entradas
-                -
-                contador.saidas
-            )
-
-            cv2.putText(
-                annotated_frame,
-                f"Ocupacao: {ocupacao}",
-                (20, 150),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (255, 255, 255),
-                2
-            )
-
-            # =========================
-            # MOSTRA
+            # VISUALIZAÇÃO
             # =========================
 
             cv2.imshow(
@@ -305,17 +137,15 @@ def main():
                 annotated_frame
             )
 
-            # Q encerra
             if (
                 cv2.waitKey(1) & 0xFF
                 ==
                 ord("q")
             ):
+
                 break
 
     finally:
-        if mqtt_service is not None:
-            mqtt_service.fechar()
 
         camera.release()
 
@@ -323,4 +153,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()

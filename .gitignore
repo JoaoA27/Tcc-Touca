@@ -7,4 +7,5 @@ __pycache__/
 
 # Ambientes virtuais
 venv/
-.venv/
+.venv/mobileclip2_b.ts
+mobileclip2_b.ts
