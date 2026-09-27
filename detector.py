@@ -10,10 +10,15 @@ from config import (
 
 
 class PersonDetector:
+
     def __init__(self):
-        self.model = YOLO(YOLO_MODEL)
+
+        self.model = YOLO(
+            YOLO_MODEL
+        )
 
     def detect(self, frame):
+
         results = self.model.predict(
             source=frame,
             imgsz=YOLO_IMAGE_SIZE,
