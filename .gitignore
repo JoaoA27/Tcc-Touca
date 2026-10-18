@@ -1,11 +1,11 @@
-# Modelos YOLO
-*.pt
-
 # Cache do Python
 __pycache__/
 *.pyc
 
 # Ambientes virtuais
 venv/
-.venv/mobileclip2_b.ts
+.venv/
+
+# Banco de dados local e pesos temporarios
+*.db
 mobileclip2_b.ts
